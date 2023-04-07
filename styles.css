@@ -1,0 +1,103 @@
+* {
+    font-family: 'Arial';
+    padding: 0;
+    margin: 0;
+    /* text-align: center; */
+    /* scroll-behavior: smooth; */
+    /* -webkit-user-select: none; */
+    /* Safari */
+    /* -moz-user-select: none; */
+    /* Firefox */
+    /* -ms-user-select: none; */
+    /* IE10+/Edge */
+    /* user-select: none; */
+    /* Standard */
+    /* touch-action: pan-y; */
+}
+
+.main {
+    width: 90%;
+    margin-left: 5%;
+    font-family: 'Arial';
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    /* background-color: lightblue; */
+    font-size: 3em;
+    font-weight: bold;
+    justify-content: space-between;
+}
+
+.topbar-button {
+    height:0.5em;
+}
+
+.level-top-line {
+    display: flex;
+    /* background-color: lightgreen; */
+    font-size: 1.5em;
+    user-select: none;
+}
+
+.level-number {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    /* font-weight: bold; */
+    border: solid black 2px;
+    border-radius: 20%;
+    width: 2.4em;
+    height: 1.2em;
+    margin: 0.1em;
+}
+
+.word {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.letter {
+    font-weight: bold;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    /* border: solid black 2px; */
+    background-color: lightgray;
+    border-radius: 20%;
+    width: 1.2em;
+    height: 1.2em;
+    margin: 0.1em;
+
+}
+
+.add-word-button {
+    /* border: solid black 2px; */
+    height: 1.2em;
+    margin: 0.1em;
+    padding-left: 0.2em;
+    padding-right: 0.2em;
+    border-radius: 0.24em;
+    background-color: lightgray;
+}
+
+.expanded-level {
+    /* if changing the display type, need to also change in the JS */
+    border-left: solid black 2px;
+    text-align: left;
+    /* background-color: aqua; */
+    padding:0;
+    margin-left: 4.4em;
+    margin-top: 0.5em;
+    margin-bottom: 1em;
+    padding-left: 0.5em;
+}
+
+.expanded-error {
+    color: red
+}
