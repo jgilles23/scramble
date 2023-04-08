@@ -194,14 +194,18 @@ class Level {
             } else {
                 analysis = compareWords(this.word, this.previousLevel.word)
             }
-            //Function to determine if the word is successful TODO allow for same length
+            //Function to determine if the word is successful
             let successfulWord: boolean = this.level <= analysis.matchCount
             if (this.previousLevel === undefined && analysis.wordLength >= this.level) {
                 successfulWord = true
             }
-            //Special case where the previous word is exactly the length needed
-            if (this.previousLevel !== undefined && this.previousLevel.word !== undefined && this.previousLevel.word.length === this.previousLevel.level && analysis.matchCount === this.previousLevel.level) {
+            //Special case where the previous word is exactly the length needed (or shorter)
+            if (this.previousLevel !== undefined && this.previousLevel.word !== undefined && this.previousLevel.word.length <= analysis.matchCount) {
                 successfulWord = true
+            }
+            //If word is shorter than the level always fails
+            if (this.word !== undefined && this.word.length < this.level) {
+                successfulWord = false
             }
             //Update the color of the word
             if (successfulWord === true && analysis.valid === true) {
