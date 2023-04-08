@@ -186,71 +186,73 @@ class Level {
             this.expansionDiv.innerHTML = "" //Clear the expansion
             // Reset the color of the number
             this.levelNumberDiv.style.backgroundColor = "lightgrey"
-            return
-        }
-        //Analyize the word
-        let analysis: WordAnalysis
-        if (this.previousLevel === undefined || this.previousLevel.word === undefined) {
-            analysis = compareWords(this.word, "")
         } else {
-            analysis = compareWords(this.word, this.previousLevel.word)
-        }
-        //Function to determine if the word is successful TODO allow for same length
-        let successfulWord: boolean = this.level <= analysis.matchCount
-        if (this.previousLevel === undefined && analysis.wordLength >= this.level) {
-            successfulWord = true
-        }
-        //Special case where the previous word is exactly the length needed
-        if (this.previousLevel !== undefined && this.previousLevel.word !== undefined && this.previousLevel.word.length === this.previousLevel.level && analysis.matchCount === this.previousLevel.level) {
-            successfulWord = true
-        }
-        //Update the color of the word
-        if (successfulWord === true && analysis.valid === true) {
-            this.levelNumberDiv.style.backgroundColor = "forestgreen"
-        } else {
-            this.levelNumberDiv.style.backgroundColor = "red"
-        }
-        //Build the letters
-        for (let i = 0; i < this.word.length; i++) {
-            let letterDiv = createDiv(this.wordDiv, "letter", this.word[i])
-            if (analysis.wordMatch[i] === true) {
-                letterDiv.style.backgroundColor = "RoyalBlue"
-            } else if (this.nextLevel === undefined || this.nextLevel.word === undefined) {
-                letterDiv.style.backgroundColor = "lightgray"
+            //Analyize the word
+            let analysis: WordAnalysis
+            if (this.previousLevel === undefined || this.previousLevel.word === undefined) {
+                analysis = compareWords(this.word, "")
             } else {
-                letterDiv.style.backgroundColor = "darkgrey"
+                analysis = compareWords(this.word, this.previousLevel.word)
             }
-        }
-        //Helper function for making a multiplication list
-        function multiplicationString(countList: Array<number>) {
-            //Take the count list and return multiplication string
-            //Form of: 3xA, 2xB, C, D
-            let s = ""
-            for (let i = 0; i < countList.length; i++) {
-                if (countList[i] === 1) {
-                    s += numToLetter(i) + ", "
-                } else if (countList[i] > 1) {
-                    s += `${countList[i]}&#x00D7;${numToLetter(i)}, `
+            //Function to determine if the word is successful TODO allow for same length
+            let successfulWord: boolean = this.level <= analysis.matchCount
+            if (this.previousLevel === undefined && analysis.wordLength >= this.level) {
+                successfulWord = true
+            }
+            //Special case where the previous word is exactly the length needed
+            if (this.previousLevel !== undefined && this.previousLevel.word !== undefined && this.previousLevel.word.length === this.previousLevel.level && analysis.matchCount === this.previousLevel.level) {
+                successfulWord = true
+            }
+            //Update the color of the word
+            if (successfulWord === true && analysis.valid === true) {
+                this.levelNumberDiv.style.backgroundColor = "forestgreen"
+            } else {
+                this.levelNumberDiv.style.backgroundColor = "red"
+            }
+            //Build the letters
+            for (let i = 0; i < this.word.length; i++) {
+                let letterDiv = createDiv(this.wordDiv, "letter", this.word[i])
+                if (analysis.wordMatch[i] === true) {
+                    letterDiv.style.backgroundColor = "RoyalBlue"
+                } else if (this.nextLevel === undefined || this.nextLevel.word === undefined) {
+                    letterDiv.style.backgroundColor = "lightgray"
+                } else {
+                    letterDiv.style.backgroundColor = "darkgrey"
                 }
             }
-            if (s === "") {
-                return "-"
+            //Helper function for making a multiplication list
+            function multiplicationString(countList: Array<number>) {
+                //Take the count list and return multiplication string
+                //Form of: 3xA, 2xB, C, D
+                let s = ""
+                for (let i = 0; i < countList.length; i++) {
+                    if (countList[i] === 1) {
+                        s += numToLetter(i) + ", "
+                    } else if (countList[i] > 1) {
+                        s += `${countList[i]}&#x00D7;${numToLetter(i)}, `
+                    }
+                }
+                if (s === "") {
+                    return "-"
+                }
+                return s.slice(0, s.length - 2)
             }
-            return s.slice(0, s.length - 2)
-        }
-        //Build the expansion
-        this.expansionDiv.innerHTML = ""
-        if (successfulWord === false) {
-            this.expansionDiv.innerHTML += "<span class='expanded-error'>word does not match enough letters</span><br>"
-        }
-        if (analysis.valid === false) {
-            this.expansionDiv.innerHTML += "<span class='expanded-error'>word is not in the dictionary</span><br>"
-        }
-        this.expansionDiv.innerHTML += `
+            //Build the expansion
+            this.expansionDiv.innerHTML = ""
+            if (successfulWord === false) {
+                this.expansionDiv.innerHTML += "<span class='expanded-error'>word does not match enough letters</span><br>"
+            }
+            if (analysis.valid === false) {
+                this.expansionDiv.innerHTML += "<span class='expanded-error'>word is not in the dictionary</span><br>"
+            }
+            this.expansionDiv.innerHTML += `
         matches: ${analysis.matchCount}<br>
         skipped letters: ${multiplicationString(analysis.skipLetters)}<br>
         word length: ${analysis.wordLength}<br>
         letter counts: ${multiplicationString(analysis.letters)}`
+        }
+        //Ensure the URL is updated --- probably calling this more times than required
+        this.updateURL()
     }
 
     promptReplaceWord() {
@@ -260,7 +262,8 @@ class Level {
             //Do nothing, user canceled the input
             return
         } else if (wordRespone === "") {
-            this.replaceWord(undefined)
+            //Do nothing, user did not submit a word
+            return
         } else {
             wordRespone = wordRespone.replace(/\s/g, "")
             wordRespone = encodeURIComponent(wordRespone)
@@ -277,7 +280,11 @@ class Level {
     }
 
     replaceWord(word: string | undefined) {
-        this.word = word
+        if (this.word === "") {
+            this.word = undefined
+        } else {
+            this.word = word
+        }
         //Expand by default
         this.expanded = true
         this.update()
@@ -310,7 +317,7 @@ class Level {
         }
     }
 
-    changeLevel(newLevel:number) {
+    changeLevel(newLevel: number) {
         //Change the level of the current word & propigate up and down
         this.level = newLevel
         this.update()
@@ -330,14 +337,106 @@ class Level {
         }
     }
 
+    getRoot(): Level {
+        //Find the root of the levels, return
+        if (this.previousLevel === undefined) {
+            return this
+        } else {
+            return this.previousLevel.getRoot()
+        }
+    }
+
+    getTail(): Level {
+        //Find the tail of the levels, return
+        if (this.nextLevel === undefined) {
+            return this
+        } else {
+            return this.nextLevel.getTail()
+        }
+    }
+
+    getWordsRecursiveDown(): Array<string> {
+        let wordList: Array<string>
+        if (this.nextLevel === undefined) {
+            wordList = []
+        } else {
+            wordList = this.nextLevel.getWordsRecursiveDown()
+        }
+        if (this.word === undefined) {
+            return wordList
+        } else {
+            wordList.unshift(this.word)
+            return wordList
+        }
+    }
+
+    updateURL() {
+        //Update the URL of the page
+        let wordArray = this.getRoot().getWordsRecursiveDown()
+        let data = this.getRoot().level.toString() + "-" + wordArray.join("-")
+        //Save to the URL
+        let currentUrl = window.location.href;
+        currentUrl = currentUrl.match(/(.*?)\?/)?.[1] || currentUrl;
+        history.pushState(null, "", `${currentUrl}?d=${data}`);
+    }
+
+}
+
+function load_game(resetFlag: boolean, undoFlag: boolean) {
+    // Clear the current screen and load the game
+    // Clear the game area
+    // Reset will clear the URL
+    // Undo flag will remove the last word added
+    let gameArea = document.getElementById("game-area") as HTMLDivElement
+    removeDivChildren(gameArea)
+    //Load the URL
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const parameterValue = urlParams.get('d');
+    console.log(parameterValue)
+    //Parse the Array
+    let urlArray: Array<any>
+    if (parameterValue === null || resetFlag === true) {
+        //IF no URL or reset is toggled
+        urlArray = ["0"]
+    } else {
+        urlArray = parameterValue.split("-")
+    }
+    // If undo flag, remove the last word from the array
+    if (undoFlag === true && urlArray.length > 1) {
+        urlArray.pop()
+    }
+    // Create the first level
+    let levelObject = new Level(undefined)
+    //Assign the level
+    let levelNumber = parseInt(urlArray[0]) as number
+    levelObject.changeLevel(levelNumber)
+    //Assign words from the URL
+    for (let i = 1; i < urlArray.length; i++) {
+        if (urlArray[i] === "") {
+            continue
+        }
+        levelObject.replaceWord(urlArray[i])
+        if (levelObject.nextLevel !== undefined) {
+            levelObject = levelObject.nextLevel
+        }
+    }
 }
 
 async function main() {
     //Create the dictionary
     dictionary = await load_file_json2(baseURL + "words_dictionary.json")
-    //Load the first level
-    let firstLevel = new Level(undefined)
-
+    // Create the game
+    load_game(false, false)
+    // Create the buttons
+    let undoButton = document.getElementById('undo-button') as HTMLImageElement
+    undoButton.onclick = () => {
+        load_game(false, true)
+    }
+    let resetButton = document.getElementById('reset-button') as HTMLImageElement
+    resetButton.onclick = () => {
+        load_game(true, false)
+    }
 }
 
 main()
