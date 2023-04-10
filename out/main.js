@@ -32,7 +32,6 @@ function load_file_json2(filepath) {
 }
 //Create the dictionary
 let dictionary;
-let outside = "hello";
 function letterToNum(letter) {
     return letter.charCodeAt(0) - 65;
 }
@@ -46,20 +45,23 @@ function createCount(word) {
     }
     return counts;
 }
-function compareWords(word, previousWord) {
+function compareWords(word, previousWord, wordLevel) {
     // Analyizes the newWord aganist the old word and creats a wordanalysis objkect
     // Object contains info about the comparison of the two words
     const analysis = {
         word: word,
+        wordLevel: wordLevel,
         wordLength: word.length,
         previousWord: previousWord,
         valid: word.toLowerCase() in dictionary,
         matchCount: 0,
+        minimumMatches: Math.min(previousWord.length, wordLevel),
         wordMatch: Array(word.length).fill(false),
         letters: createCount(word),
         matchLetters: Array(26).fill(0),
         skipLetters: createCount(previousWord),
         newLetters: Array(26).fill(0),
+        successful: false,
     };
     //Create word counts
     const wordCounts = createCount(word);
@@ -79,7 +81,29 @@ function compareWords(word, previousWord) {
             analysis.newLetters[num] += 1;
         }
     }
+    // Check if the word is a valid play
+    if (word.length >= wordLevel && analysis.matchCount >= analysis.minimumMatches) {
+        analysis.successful = true;
+    }
     return analysis;
+}
+//Helper function for making a multiplication list
+function multiplicationString(countList) {
+    //Take the count list and return multiplication string
+    //Form of: 3xA, 2xB, C, D
+    let s = "";
+    for (let i = 0; i < countList.length; i++) {
+        if (countList[i] === 1) {
+            s += numToLetter(i) + ", ";
+        }
+        else if (countList[i] > 1) {
+            s += `${countList[i]}&#x00D7;${numToLetter(i)}, `;
+        }
+    }
+    if (s === "") {
+        return "-";
+    }
+    return s.slice(0, s.length - 2);
 }
 function createDiv(parentDiv, className, textContent) {
     //Create a new HTML div element set the className, textContent, and assign as a child of parent
@@ -101,61 +125,26 @@ class LevelBase {
         // Build an empty level object (has the add word button)
         this.game = game;
         this.level = level;
-        this.expanded = false;
-    }
-}
-// Main script for scramble car game
-class Level {
-    constructor(previousLevel) {
-        //Create a word on the word list --- use the functions below to set to add a word
-        //Link to other words & highlight letters / count statistics
-        this.previousLevel = previousLevel;
-        if (this.previousLevel !== undefined) {
-            this.previousLevel.nextLevel = this;
-            this.level = this.previousLevel.level + 1;
-        }
-        else {
-            this.level = 0;
-        }
-        this.nextLevel = undefined;
-        //Set other paramters
         this.expanded = true;
         //Find the main div element to place under
-        const gameAreaDiv = document.getElementById("game-area");
-        const levelAreaDiv = createDiv(gameAreaDiv, "", "");
+        this.levelAreaDiv = createDiv(this.game.gameDiv, "", "");
         //Create the top line
-        const levelTopLineDiv = createDiv(levelAreaDiv, "level-top-line", "");
-        this.levelNumberDiv = createDiv(levelTopLineDiv, "letter", "-"); //Level Number -- added in "update"
-        this.levelNumberDiv.onclick = () => {
-            if (this.nextLevel === undefined) {
-                this.promptChangeLevel();
-            }
-        };
+        const levelTopLineDiv = createDiv(this.levelAreaDiv, "level-top-line", "");
+        this.levelNumberDiv = createDiv(levelTopLineDiv, "letter", this.level.toString()); //Level Number
         this.levelArrowDiv = createDiv(levelTopLineDiv, "letter", ">");
         this.levelArrowDiv.style.backgroundColor = "white";
         this.levelArrowDiv.onclick = () => {
-            this.expanded = !this.expanded;
-            this.update();
+            this.updateExpansion(!this.expanded);
         };
-        this.wordDiv = createDiv(levelTopLineDiv, "word", "");
-        this.wordDiv.onclick = () => {
-            if (this.nextLevel === undefined || this.nextLevel.word === undefined) {
-                this.promptReplaceWord(); //Add onclick for the word area
-            }
-        };
+        //Create the word area
+        this.wordDiv = createDiv(levelTopLineDiv, "word", ""); //on-click should be defined in the Game object
         //Create the expanded area
-        this.expansionDiv = createDiv(levelAreaDiv, "expanded-level", "start test");
-        //Update
-        this.update();
+        this.expansionDiv = createDiv(this.levelAreaDiv, "expanded-level", "");
+        this.updateExpansion(this.expanded);
     }
-    update() {
-        //Update the elements of the Level to show correctly given how the properties of the word have been set
-        this.levelNumberDiv.textContent = this.level.toString();
-        //Check if should be expanded
-        if (this.word === undefined) {
-            this.expanded = false;
-        }
-        //Need to update the expansion arrow
+    updateExpansion(expansionFlag) {
+        this.expanded = expansionFlag;
+        // Show or hide the expansion
         if (this.expanded === true) {
             this.levelArrowDiv.textContent = "v";
             this.expansionDiv.style.display = "block";
@@ -164,254 +153,224 @@ class Level {
             this.levelArrowDiv.textContent = ">";
             this.expansionDiv.style.display = "none";
         }
-        //Remove the children of the word
-        removeDivChildren(this.wordDiv);
-        //Check if the word is undefined --- ending analysis
-        if (this.word === undefined) {
-            //IF there is no word, only put the add word button
-            const addWordDiv = createDiv(this.wordDiv, "add-word-button", "add word");
-            this.expansionDiv.innerHTML = ""; //Clear the expansion
-            // Reset the color of the number
-            this.levelNumberDiv.style.backgroundColor = "lightgrey";
+    }
+}
+class NewWordLevel extends LevelBase {
+    constructor(game, level) {
+        super(game, level);
+        // Class for holding the "add word" level of the game
+        const addWordDiv = createDiv(this.wordDiv, "add-word-button", "add word");
+        // Make adding a word clickabl
+        addWordDiv.onclick = () => {
+            this.game.userAddWord();
+        };
+        // Close the expansion
+        this.updateExpansion(false);
+    }
+    updateLevelNumber(levelNumber) {
+        //Update the level number of the word
+        this.level = levelNumber;
+        this.levelNumberDiv.textContent = this.level.toString();
+    }
+    checkDictionary() {
+        // Check the dictionary to see if there are still words that are likely
+        // to fit the currently required pattern
+        if (this.game.levels.length === 0) {
+            return;
+        }
+        console.log("checking");
+        let word = this.game.levels[this.game.levels.length - 1].word;
+        console.log(word);
+        let count = 0;
+        for (let key in dictionary) {
+            const analysis = compareWords(key.toUpperCase(), word, this.level);
+            if (key === "peoples") {
+                console.log("here");
+            }
+            if (analysis.successful === true) {
+                console.log("found:", key.toUpperCase());
+                count += 1;
+                if (count > 100) {
+                    return;
+                }
+            }
+        }
+    }
+}
+// Main script for scramble car game
+class Level extends LevelBase {
+    constructor(game, level, word, previousWord) {
+        //Create a word on the word list --- use the functions below to set to add a word
+        // If the previous word does not exist, input "" as the previous word
+        super(game, level);
+        this.word = word;
+        this.previousWord = previousWord;
+        // Analyize the word aganist the previous word
+        this.analysis = compareWords(word, previousWord, this.level);
+        // Update the color of the level number
+        if (this.analysis.successful === true && this.analysis.valid === true) {
+            this.levelNumberDiv.style.backgroundColor = "forestgreen";
         }
         else {
-            //Analyize the word
-            let analysis;
-            if (this.previousLevel === undefined || this.previousLevel.word === undefined) {
-                analysis = compareWords(this.word, "");
-            }
-            else {
-                analysis = compareWords(this.word, this.previousLevel.word);
-            }
-            //Function to determine if the word is successful
-            let successfulWord = this.level <= analysis.matchCount;
-            if (this.previousLevel === undefined && analysis.wordLength >= this.level) {
-                successfulWord = true;
-            }
-            //Special case where the previous word is exactly the length needed (or shorter)
-            if (this.previousLevel !== undefined && this.previousLevel.word !== undefined && this.previousLevel.word.length <= analysis.matchCount) {
-                successfulWord = true;
-            }
-            //If word is shorter than the level always fails
-            if (this.word !== undefined && this.word.length < this.level) {
-                successfulWord = false;
-            }
-            //Update the color of the word
-            if (successfulWord === true && analysis.valid === true) {
-                this.levelNumberDiv.style.backgroundColor = "forestgreen";
-            }
-            else {
-                this.levelNumberDiv.style.backgroundColor = "red";
-            }
-            //Build the letters
-            for (let i = 0; i < this.word.length; i++) {
-                let letterDiv = createDiv(this.wordDiv, "letter", this.word[i]);
-                if (analysis.wordMatch[i] === true) {
-                    letterDiv.style.backgroundColor = "RoyalBlue";
-                }
-                else if (this.nextLevel === undefined || this.nextLevel.word === undefined) {
-                    letterDiv.style.backgroundColor = "lightgray";
-                }
-                else {
-                    letterDiv.style.backgroundColor = "darkgrey";
-                }
-            }
-            //Helper function for making a multiplication list
-            function multiplicationString(countList) {
-                //Take the count list and return multiplication string
-                //Form of: 3xA, 2xB, C, D
-                let s = "";
-                for (let i = 0; i < countList.length; i++) {
-                    if (countList[i] === 1) {
-                        s += numToLetter(i) + ", ";
-                    }
-                    else if (countList[i] > 1) {
-                        s += `${countList[i]}&#x00D7;${numToLetter(i)}, `;
-                    }
-                }
-                if (s === "") {
-                    return "-";
-                }
-                return s.slice(0, s.length - 2);
-            }
-            //Build the expansion
-            this.expansionDiv.innerHTML = "";
-            if (successfulWord === false) {
-                this.expansionDiv.innerHTML += "<span class='expanded-error'>word does not match enough letters</span><br>";
-            }
-            if (analysis.valid === false) {
-                this.expansionDiv.innerHTML += "<span class='expanded-error'>word is not in the dictionary</span><br>";
-            }
-            this.expansionDiv.innerHTML += `
-        matches: ${analysis.matchCount}<br>
-        skipped letters: ${multiplicationString(analysis.skipLetters)}<br>
-        word length: ${analysis.wordLength}<br>
-        letter counts: ${multiplicationString(analysis.letters)}`;
+            this.levelNumberDiv.style.backgroundColor = "red";
         }
-        //Ensure the URL is updated --- probably calling this more times than required
+        // Build up the letters
+        for (let i = 0; i < this.word.length; i++) {
+            let letterDiv = createDiv(this.wordDiv, "letter", this.word[i]);
+            if (this.analysis.wordMatch[i] === true) {
+                letterDiv.style.backgroundColor = "RoyalBlue";
+            }
+        }
+        //Build the expansion
+        if (this.analysis.matchCount < this.analysis.minimumMatches) {
+            this.expansionDiv.innerHTML += `<span class='expanded-error'>word does not match ${this.analysis.minimumMatches} or more letters</span><br>`;
+        }
+        if (this.analysis.wordLength < this.analysis.wordLevel) {
+            this.expansionDiv.innerHTML += `<span class='expanded-error'>word is not at least ${this.analysis.wordLevel} letters</span><br>`;
+        }
+        if (this.analysis.valid === false) {
+            this.expansionDiv.innerHTML += "<span class='expanded-error'>word is not in the dictionary</span><br>";
+        }
+        this.expansionDiv.innerHTML += `
+        matches: ${this.analysis.matchCount}<br>
+        skipped letters: ${multiplicationString(this.analysis.skipLetters)}<br>
+        word length: ${this.analysis.wordLength}<br>
+        letter counts: ${multiplicationString(this.analysis.letters)}`;
+    }
+}
+class Game {
+    constructor(gameDiv, baseLevelNumber) {
+        //Create a class object for holding the game
+        this.levels = [];
+        this.baseLevelNumber = baseLevelNumber;
+        this.gameDiv = gameDiv;
+        this.addWordLevel = new NewWordLevel(this, baseLevelNumber);
         this.updateURL();
     }
-    promptReplaceWord() {
-        //Replace the word HTML
+    loadString(str) {
+        // Load a string into the game --- stored in the d value
+    }
+    promptWord() {
+        // Prompt the user to input a new word --- returns "" if no word is provided
         let wordRespone = prompt('Input a new word:');
-        if (wordRespone === null) {
+        if (wordRespone === null || wordRespone === "") {
             //Do nothing, user canceled the input
-            return;
-        }
-        else if (wordRespone === "") {
-            //Do nothing, user did not submit a word
-            return;
+            return "";
         }
         else {
+            // Sanatize the imput
             wordRespone = wordRespone.replace(/\s/g, "");
             wordRespone = encodeURIComponent(wordRespone);
             wordRespone = wordRespone.toUpperCase();
             if (/^[a-zA-Z]+$/.test(wordRespone)) {
                 //Valid input
-                this.replaceWord(wordRespone);
+                return wordRespone;
             }
             else {
                 //Invalid input try again
-                this.promptReplaceWord();
-                return;
+                return this.promptWord();
             }
         }
     }
-    replaceWord(word) {
-        if (this.word === "") {
-            this.word = undefined;
-        }
-        else {
-            this.word = word;
-        }
-        //Expand by default
-        this.expanded = true;
-        this.update();
-        //IF the next word does not yet exist, add it
-        if (this.word !== undefined && this.nextLevel === undefined) {
-            new Level(this);
-            // Minimize the previous levels
-            if (this.previousLevel !== undefined) {
-                this.previousLevel.minimizeLevels();
-            }
-        }
-    }
-    promptChangeLevel() {
-        //Replace the word HTML
-        let numberResponse = prompt('Input the correct level:');
-        if (numberResponse === null || numberResponse === "") {
-            //Do nothing, user canceled the input
+    userReplaceWord() {
+        // replace the most recent word on the levels list after prompting the user
+        // performs the equivelent of removeWord() then addWord()
+        let word = this.promptWord();
+        if (word === "") {
+            //User did not supply a word
             return;
         }
-        else {
-            numberResponse = encodeURIComponent(numberResponse);
-            if (/^\d+$/.test(numberResponse)) {
-                //Valid input
-                this.changeLevel(parseInt(numberResponse));
-            }
-            else {
-                //Invalid input try again
-                this.promptChangeLevel();
-                return;
-            }
-        }
+        // Remove last word, add the word
+        this.removeWord();
+        this.addWord(word);
     }
-    changeLevel(newLevel) {
-        //Change the level of the current word & propigate up and down
-        this.level = newLevel;
-        this.update();
-        //Update previous level
-        if (this.previousLevel !== undefined) {
-            this.previousLevel.changeLevel(this.level - 1);
+    userAddWord() {
+        // Add a wword to the level list after prompting the user
+        let word = this.promptWord();
+        if (word === "") {
+            //User did not supply a word
+            return;
         }
+        this.addWord(word);
     }
-    minimizeLevels() {
-        // Minimize this level and each level below
-        this.expanded = false;
-        this.update();
-        //update previous levels
-        if (this.previousLevel !== undefined) {
-            this.previousLevel.minimizeLevels();
+    addWord(word) {
+        // Minimize all the existing levels & make not clickable
+        for (let level of this.levels) {
+            level.updateExpansion(false);
+            level.wordDiv.onclick = null;
         }
-    }
-    getRoot() {
-        //Find the root of the levels, return
-        if (this.previousLevel === undefined) {
-            return this;
+        // Add a word to the game (add a level)
+        let newWord;
+        if (this.levels.length === 0) {
+            //First level
+            this.levels.push(new Level(this, this.baseLevelNumber, word, ""));
         }
         else {
-            return this.previousLevel.getRoot();
+            // Add a level
+            let previousLevel = this.levels[this.levels.length - 1];
+            this.levels.push(new Level(this, previousLevel.level + 1, word, previousLevel.word));
         }
+        // Update the addWordLevel, put back at the end of the div
+        this.addWordLevel.updateLevelNumber(this.baseLevelNumber + this.levels.length);
+        this.gameDiv.appendChild(this.addWordLevel.levelAreaDiv);
+        // Open the last word and make it clickable
+        this.setTailWord();
+        // Update url
+        this.updateURL();
     }
-    getTail() {
-        //Find the tail of the levels, return
-        if (this.nextLevel === undefined) {
-            return this;
+    removeWord() {
+        // Remove the most recently added word
+        if (this.levels.length > 0) {
+            let lastLevel = this.levels[this.levels.length - 1];
+            this.gameDiv.removeChild(lastLevel.levelAreaDiv);
+            this.levels.pop();
         }
-        else {
-            return this.nextLevel.getTail();
-        }
+        // Update the addWordLevel
+        this.addWordLevel.updateLevelNumber(this.baseLevelNumber + this.levels.length);
+        // Show the expansion of the last word & make it clickable
+        this.setTailWord();
+        // Update URL
+        this.updateURL();
     }
-    getWordsRecursiveDown() {
-        let wordList;
-        if (this.nextLevel === undefined) {
-            wordList = [];
+    setTailWord() {
+        //Expand the last word in the list & make it clickable
+        if (this.levels.length === 0) {
+            return;
         }
-        else {
-            wordList = this.nextLevel.getWordsRecursiveDown();
+        let lastLevel = this.levels[this.levels.length - 1];
+        lastLevel.updateExpansion(true);
+        lastLevel.wordDiv.onclick = () => {
+            this.userReplaceWord();
+        };
+    }
+    generateSaveString() {
+        // Generate a save string in the form of [base level]-[word 0]-[word 1]-
+        let str = this.baseLevelNumber.toString() + "-";
+        for (let level of this.levels) {
+            str += level.word + "-";
         }
-        if (this.word === undefined) {
-            return wordList;
-        }
-        else {
-            wordList.unshift(this.word);
-            return wordList;
-        }
+        return str;
     }
     updateURL() {
         var _a;
-        //Update the URL of the page
-        let wordArray = this.getRoot().getWordsRecursiveDown();
-        let data = this.getRoot().level.toString() + "-" + wordArray.join("-");
+        // Save the current game to the url of the webpage
+        let data = this.generateSaveString();
         //Save to the URL
         let currentUrl = window.location.href;
         currentUrl = ((_a = currentUrl.match(/(.*?)\?/)) === null || _a === void 0 ? void 0 : _a[1]) || currentUrl;
         history.pushState(null, "", `${currentUrl}?d=${data}`);
     }
 }
-class Game {
-    constructor(gameDiv) {
-        //Create a class object for holding the game
-        this.levels = [];
-        this.addWordLevel = new Level(undefined);
-        this.baseLevelNumber = 0;
-        this.gameDiv = gameDiv;
-    }
-    loadString(str) {
-        // Load a string into the game --- stored in the d value
-    }
-    editWord() {
-        // edit the most recent word on the levels list
-    }
-    addWord() {
-        // Add a word to the game (add a level)
-    }
-    removeWord() {
-        // Remove a word from the levels
-    }
-}
-function load_game(resetFlag, undoFlag) {
-    // Clear the current screen and load the game
-    // Clear the game area
+function load_game(resetFlag, baseLevelOverride) {
+    // create a Game object
     // Reset will clear the URL
-    // Undo flag will remove the last word added
+    // If baseLevelOverride >= 0, change the base level
     let gameArea = document.getElementById("game-area");
     removeDivChildren(gameArea);
     //Load the URL
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     const parameterValue = urlParams.get('d');
-    console.log(parameterValue);
     //Parse the Array
     let urlArray;
     if (parameterValue === null || resetFlag === true) {
@@ -421,41 +380,54 @@ function load_game(resetFlag, undoFlag) {
     else {
         urlArray = parameterValue.split("-");
     }
-    // If undo flag, remove the last word from the array
-    if (undoFlag === true && urlArray.length > 1) {
-        urlArray.pop();
-    }
-    // Create the first level
-    let levelObject = new Level(undefined);
-    //Assign the level
+    // Create the game
     let levelNumber = parseInt(urlArray[0]);
-    levelObject.changeLevel(levelNumber);
+    if (baseLevelOverride >= 0) {
+        levelNumber = baseLevelOverride;
+    }
+    let game = new Game(gameArea, levelNumber);
     //Assign words from the URL
     for (let i = 1; i < urlArray.length; i++) {
         if (urlArray[i] === "") {
             continue;
         }
-        levelObject.replaceWord(urlArray[i]);
-        if (levelObject.nextLevel !== undefined) {
-            levelObject = levelObject.nextLevel;
-        }
+        game.addWord(urlArray[i]);
     }
+    // Re-assign the buttons to the new game elements
+    // Button to allow the user to set the base level
+    let numberSetButton = document.getElementById('number-button');
+    numberSetButton.onclick = () => {
+        //Replace the word HTML
+        let numberResponse = prompt('Input the correct base level:');
+        if (numberResponse === null || numberResponse === "") {
+            //Do nothing, user canceled the input
+            return;
+        }
+        else {
+            numberResponse = encodeURIComponent(numberResponse);
+            if (/^\d+$/.test(numberResponse) && parseInt(numberResponse) >= 0) {
+                //Valid input
+                load_game(false, parseInt(numberResponse));
+            }
+        }
+    };
+    // Undo last word button
+    let undoButton = document.getElementById('undo-button');
+    undoButton.onclick = () => {
+        game.removeWord();
+    };
+    // Reset entire game button
+    let resetButton = document.getElementById('reset-button');
+    resetButton.onclick = () => {
+        load_game(true, -1);
+    };
 }
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         //Create the dictionary
         dictionary = yield load_file_json2(baseURL + "words_dictionary.json");
         // Create the game
-        load_game(false, false);
-        // Create the buttons
-        let undoButton = document.getElementById('undo-button');
-        undoButton.onclick = () => {
-            load_game(false, true);
-        };
-        let resetButton = document.getElementById('reset-button');
-        resetButton.onclick = () => {
-            load_game(true, false);
-        };
+        load_game(false, -1);
     });
 }
 main();
