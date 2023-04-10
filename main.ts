@@ -107,6 +107,21 @@ function removeDivChildren(div: HTMLDivElement) {
     div.innerHTML = ""
 }
 
+class LevelBase {
+    // Level with the add "add word" button
+    game: Game
+    level: number
+    expanded: false
+
+    constructor(game:Game, level: number) {
+        // Build an empty level object (has the add word button)
+        this.game = game
+        this.level = level
+        this.expanded = false
+        
+    }
+}
+
 // Main script for scramble car game
 class Level {
     levelNumberDiv: HTMLDivElement
@@ -382,6 +397,36 @@ class Level {
         let currentUrl = window.location.href;
         currentUrl = currentUrl.match(/(.*?)\?/)?.[1] || currentUrl;
         history.pushState(null, "", `${currentUrl}?d=${data}`);
+    }
+
+}
+
+class Game {
+    // Class for holding the current game and manipulating the current game
+    levels: Array<Level>
+    addWordLevel: Level
+    baseLevelNumber: number
+    gameDiv: HTMLDivElement
+    constructor(gameDiv:HTMLDivElement) {
+        //Create a class object for holding the game
+        this.levels = []
+        this.addWordLevel = new Level(undefined)
+        this.baseLevelNumber = 0
+        this.gameDiv = gameDiv
+    }
+    loadString(str:string) {
+        // Load a string into the game --- stored in the d value
+    }
+    editWord() {
+        // edit the most recent word on the levels list
+
+    }
+    addWord() {
+        // Add a word to the game (add a level)
+
+    }
+    removeWord() {
+        // Remove a word from the levels
     }
 
 }

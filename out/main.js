@@ -96,6 +96,14 @@ function createDiv(parentDiv, className, textContent) {
 function removeDivChildren(div) {
     div.innerHTML = "";
 }
+class LevelBase {
+    constructor(game, level) {
+        // Build an empty level object (has the add word button)
+        this.game = game;
+        this.level = level;
+        this.expanded = false;
+    }
+}
 // Main script for scramble car game
 class Level {
     constructor(previousLevel) {
@@ -369,6 +377,27 @@ class Level {
         let currentUrl = window.location.href;
         currentUrl = ((_a = currentUrl.match(/(.*?)\?/)) === null || _a === void 0 ? void 0 : _a[1]) || currentUrl;
         history.pushState(null, "", `${currentUrl}?d=${data}`);
+    }
+}
+class Game {
+    constructor(gameDiv) {
+        //Create a class object for holding the game
+        this.levels = [];
+        this.addWordLevel = new Level(undefined);
+        this.baseLevelNumber = 0;
+        this.gameDiv = gameDiv;
+    }
+    loadString(str) {
+        // Load a string into the game --- stored in the d value
+    }
+    editWord() {
+        // edit the most recent word on the levels list
+    }
+    addWord() {
+        // Add a word to the game (add a level)
+    }
+    removeWord() {
+        // Remove a word from the levels
     }
 }
 function load_game(resetFlag, undoFlag) {
